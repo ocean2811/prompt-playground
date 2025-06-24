@@ -41,15 +41,15 @@
 ## 🛠️ 安装使用
 
 ### 方式一：直接使用
-1. 下载 `prompt_debugger_v6.html` 文件
+1. 下载 `prompt-playground.html` 文件
 2. 用浏览器打开文件即可使用
 3. 无需安装任何依赖或服务器
 
 ### 方式二：本地服务器
 ```bash
 # 克隆项目
-git clone https://github.com/your-username/ai-prompt-debugger.git
-cd ai-prompt-debugger
+git clone https://github.com/ocean2811/prompt-playground.git
+cd prompt-playground
 
 # 启动本地服务器（可选）
 python -m http.server 8000
