@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI提示词调试工具</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 10px;
+            overflow: hidden;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            height: calc(100vh - 20px);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: white;
+            padding: 12px 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 1.4rem;
+            margin-bottom: 4px;
+            font-weight: 600;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 0.85rem;
+            min-height: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .header p.status-success {
+            opacity: 1;
+            color: #10b981;
+            font-weight: 500;
+        }
+
+        .header p.status-error {
+            opacity: 1;
+            color: #f87171;
+            font-weight: 500;
+        }
+
+        .header p.status-info {
+            opacity: 1;
+            color: #60a5fa;
+            font-weight: 500;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 260px 1fr;
+            flex: 1;
+            overflow: hidden;
+            transition: grid-template-columns 0.3s ease;
+        }
+
+        .main-content.collapsed {
+            grid-template-columns: 40px 1fr;
+        }
+
+        .sidebar {
+            background: #f8fafc;
+            border-right: 1px solid #e2e8f0;
+            padding: 16px;
+            position: relative;
+            overflow-y: auto;
+            overflow-x: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .sidebar.collapsed {
+            padding: 6px;
+        }
+
+        .sidebar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .sidebar.collapsed .sidebar-header {
+            justify-content: center;
+            margin-bottom: 0;
+        }
+
+        .sidebar-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #374151;
+            transition: all 0.3s ease;
+        }
+
+        .sidebar.collapsed .sidebar-title {
+            opacity: 0;
+            width: 0;
+            overflow: hidden;
+        }
+
+        .collapse-btn {
+            background: none;
+            border: none;
+            font-size: 1rem;
+            cursor: pointer;
+            padding: 6px;
+            border-radius: 4px;
+            color: #6b7280;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 28px;
+            height: 28px;
+        }
+
+        .collapse-btn:hover {
+            background: #e5e7eb;
+            color: #374151;
+        }
+
+        .sidebar-content {
+            transition: all 0.3s ease;
+        }
+
+        .sidebar.collapsed .sidebar-content {
+            opacity: 0;
+            pointer-events: none;
+            height: 0;
+            overflow: hidden;
+        }
+
+        .config-section {
+            margin-bottom: 16px;
+        }
+
+        .config-section h3 {
+            color: #374151;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .form-group {
+            margin-bottom: 10px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: #4b5563;
+            margin-bottom: 4px;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 6px 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.1);
+        }
+
+        .chat-area {
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            height: 100%;
+        }
+
+        .prompt-section {
+            margin-bottom: 12px;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .section-header h3 {
+            color: #374151;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .char-count {
+            font-size: 0.75rem;
+            color: #6b7280;
+            background: #f3f4f6;
+            padding: 2px 6px;
+            border-radius: 3px;
+            min-width: 40px;
+            text-align: center;
+        }
+
+        .prompt-textarea {
+            width: 100%;
+            min-height: 70px;
+            max-height: 90px;
+            padding: 8px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            line-height: 1.4;
+            resize: vertical;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .prompt-textarea:focus {
+            outline: none;
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.1);
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 3px 8px rgba(79, 70, 229, 0.3);
+        }
+
+        .btn-stop {
+            background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+            color: white;
+        }
+
+        .btn-stop:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 3px 8px rgba(220, 38, 38, 0.3);
+        }
+
+        .btn-secondary {
+            background: #f3f4f6;
+            color: #4b5563;
+            border: 1px solid #d1d5db;
+        }
+
+        .btn-secondary:hover {
+            background: #e5e7eb;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .response-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        .response-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .response-header h3 {
+            color: #374151;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .copy-btn {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            color: #4b5563;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .copy-btn:hover {
+            background: #e2e8f0;
+            color: #374151;
+        }
+
+        .copy-btn.copied {
+            background: #dcfce7;
+            color: #16a34a;
+            border-color: #bbf7d0;
+        }
+
+        .response-area {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            flex: 1;
+            padding: 12px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.85rem;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            min-height: 120px;
+            resize: vertical;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .response-area:focus {
+            outline: none;
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.1);
+        }
+
+        .usage-section {
+            margin-top: 12px;
+        }
+
+        .usage-section h3 {
+            color: #374151;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .usage-area {
+            background: #f0f9ff;
+            border: 1px solid #bae6fd;
+            border-radius: 6px;
+            padding: 8px;
+            font-size: 0.85rem;
+        }
+
+        .usage-grid {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: nowrap;
+        }
+
+        .usage-item {
+            background: white;
+            padding: 6px 10px;
+            border-radius: 4px;
+            border: 1px solid #e0f2fe;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 0;
+            flex: 1;
+        }
+
+        .usage-item-label {
+            font-weight: 600;
+            color: #0369a1;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.2px;
+            margin-bottom: 2px;
+            white-space: nowrap;
+        }
+
+        .usage-item-value {
+            font-size: 0.9rem;
+            color: #1e40af;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        .usage-item-unit {
+            font-size: 0.7rem;
+            color: #6b7280;
+            margin-left: 2px;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid #e5e7eb;
+            border-radius: 50%;
+            border-top-color: #4f46e5;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 0;
+            }
+
+            .container {
+                height: 100vh;
+                border-radius: 0;
+            }
+
+            .main-content,
+            .main-content.collapsed {
+                grid-template-columns: 1fr;
+            }
+
+            .sidebar,
+            .sidebar.collapsed {
+                border-right: none;
+                border-bottom: 1px solid #e2e8f0;
+                padding: 12px;
+            }
+
+            .sidebar.collapsed {
+                padding: 6px 12px;
+            }
+
+            .sidebar.collapsed .sidebar-content {
+                display: none;
+            }
+
+            .usage-grid {
+                flex-wrap: wrap;
+            }
+
+            .usage-item {
+                flex: 0 0 calc(33.333% - 8px);
+            }
+        }
+
+        /* 针对小屏幕高度的优化 */
+        @media (max-height: 700px) {
+            .header {
+                padding: 8px 16px;
+            }
+
+            .header h1 {
+                font-size: 1.2rem;
+                margin-bottom: 2px;
+            }
+
+            .prompt-textarea {
+                min-height: 50px;
+                max-height: 70px;
+            }
+
+            .chat-area {
+                padding: 12px;
+            }
+
+            .response-area {
+                min-height: 80px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 AI提示词调试工具</h1>
+            <p id="headerStatus">>___</p>
+        </div>
+
+        <div class="main-content" id="mainContent">
+            <div class="sidebar" id="sidebar">
+                <div class="sidebar-header">
+                    <div class="sidebar-title">⚙️ 配置</div>
+                    <button class="collapse-btn" id="collapseBtn" title="收缩配置面板">
+                        ‹
+                    </button>
+                </div>
+
+                <div class="sidebar-content">
+                    <div class="config-section">
+                        <h3>API配置</h3>
+                        <div class="form-group">
+                            <label for="baseUrl">Base URL</label>
+                            <input type="text" id="baseUrl"
+                                placeholder="https://dashscope.aliyuncs.com/compatible-mode/v1"
+                                value="https://dashscope.aliyuncs.com/compatible-mode/v1">
+                        </div>
+                        <div class="form-group">
+                            <label for="apiKey">API Key</label>
+                            <input type="password" id="apiKey" placeholder="sk-...">
+                        </div>
+                    </div>
+
+                    <div class="config-section">
+                        <h3>模型参数</h3>
+                        <div class="form-group">
+                            <label for="model">模型</label>
+                            <input type="text" id="model" placeholder="qwen-max" value="qwen-max">
+                        </div>
+                        <div class="form-group">
+                            <label for="temperature">温度 (0-2)</label>
+                            <input type="range" id="temperature" min="0" max="2" step="0.1" value="0.8">
+                            <span id="temperatureValue">0.8</span>
+                        </div>
+                        <div class="form-group">
+                            <label for="maxTokens">最大Token数</label>
+                            <input type="number" id="maxTokens" placeholder="8192" value="8192">
+                        </div>
+                        <div class="form-group">
+                            <label for="responseFormat">回答格式</label>
+                            <select id="responseFormat">
+                                <option value="">Text</option>
+                                <option value="json_object">JSON Object</option>
+                                <option value="json_schema">JSON Schema</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chat-area">
+                <div class="prompt-section">
+                    <div class="section-header">
+                        <h3>🎯 系统提示词</h3>
+                        <span class="char-count" id="systemPromptCount">0</span>
+                    </div>
+                    <textarea id="systemPrompt" class="prompt-textarea" placeholder="输入系统提示词..."></textarea>
+                </div>
+
+                <div class="prompt-section">
+                    <div class="section-header">
+                        <h3>💬 用户提示词</h3>
+                        <span class="char-count" id="userPromptCount">0</span>
+                    </div>
+                    <textarea id="userPrompt" class="prompt-textarea" placeholder="输入用户提示词..."></textarea>
+                </div>
+
+                <div class="actions">
+                    <button id="sendBtn" class="btn btn-primary">
+                        <span id="sendBtnText">🚀 发送请求</span>
+                        <div id="loading" class="loading" style="display: none;"></div>
+                    </button>
+                    <button id="clearBtn" class="btn btn-secondary">🗑️ 清空</button>
+                </div>
+
+                <div class="response-section">
+                    <div class="response-header">
+                        <div class="section-header" style="margin-bottom: 0;">
+                            <h3>🤖 AI回答</h3>
+                            <span class="char-count" id="responseCount">0</span>
+                        </div>
+                        <button id="copyBtn" class="copy-btn" title="复制回答内容">
+                            📋 复制
+                        </button>
+                    </div>
+                    <textarea id="responseArea" class="response-area" readonly placeholder="等待AI回答..."></textarea>
+                </div>
+
+                <div class="usage-section" id="usageSection">
+                    <h3>📊 请求统计信息</h3>
+                    <div id="usageArea" class="usage-area">
+                        <div class="usage-grid" id="usageGrid">
+                            <div class="usage-item">
+                                <div class="usage-item-label">请求耗时</div>
+                                <div class="usage-item-value" id="durationValue">-</div>
+                            </div>
+                            <div class="usage-item">
+                                <div class="usage-item-label">输入Token</div>
+                                <div class="usage-item-value" id="inputTokenValue">-</div>
+                            </div>
+                            <div class="usage-item">
+                                <div class="usage-item-label">输入计费</div>
+                                <div class="usage-item-value" id="inputCostValue">-</div>
+                            </div>
+                            <div class="usage-item">
+                                <div class="usage-item-label">输出Token</div>
+                                <div class="usage-item-value" id="outputTokenValue">-</div>
+                            </div>
+                            <div class="usage-item">
+                                <div class="usage-item-label">输出计费</div>
+                                <div class="usage-item-value" id="outputCostValue">-</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let configStorage = {
+            baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+            apiKey: '',
+            model: 'qwen-plus',
+            temperature: 0.8,
+            maxTokens: 8192,
+            responseFormat: '',
+            systemPrompt: '',
+            userPrompt: '',
+        };
+
+        // 请求统计数据
+        let requestStats = {
+            startTime: 0,
+            endTime: 0,
+            duration: 0,
+            usage: null
+        };
+
+        // 请求控制器和状态
+        let currentController = null;
+        let currentReader = null;
+        let isRequesting = false;
+
+        // 更新字符计数
+        function updateCharCount(textareaId, countId) {
+            const textarea = document.getElementById(textareaId);
+            const countElement = document.getElementById(countId);
+            const count = textarea.value.length;
+            countElement.textContent = count.toLocaleString();
+        }
+
+        // 复制文本到剪贴板
+        async function copyToClipboard(text) {
+            try {
+                await navigator.clipboard.writeText(text);
+                return true;
+            } catch (err) {
+                // 降级方案
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                textArea.style.position = 'fixed';
+                textArea.style.left = '-999999px';
+                textArea.style.top = '-999999px';
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+
+                try {
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                    return true;
+                } catch (err) {
+                    document.body.removeChild(textArea);
+                    return false;
+                }
+            }
+        }
+
+        // 复制AI回答
+        async function copyResponse() {
+            const responseArea = document.getElementById('responseArea');
+            const copyBtn = document.getElementById('copyBtn');
+
+            const success = await copyToClipboard(responseArea.value);
+
+            if (success) {
+                copyBtn.innerHTML = '✅ 已复制';
+                copyBtn.classList.add('copied');
+
+                setTimeout(() => {
+                    copyBtn.innerHTML = '📋 复制';
+                    copyBtn.classList.remove('copied');
+                }, 2000);
+
+                showStatus('回答内容已复制到剪贴板', 'success');
+            } else {
+                showStatus('复制失败，请手动选择文本复制', 'error');
+            }
+        }
+
+        // 页面加载时恢复配置
+        function loadConfig() {
+            try {
+                const saved = localStorage.getItem('aiDebuggerConfig');
+                if (saved) {
+                    configStorage = { ...configStorage, ...JSON.parse(saved) };
+                }
+
+                document.getElementById('baseUrl').value = configStorage.baseUrl;
+                document.getElementById('apiKey').value = configStorage.apiKey;
+                document.getElementById('model').value = configStorage.model;
+                document.getElementById('temperature').value = configStorage.temperature;
+                document.getElementById('maxTokens').value = configStorage.maxTokens;
+                document.getElementById('responseFormat').value = configStorage.responseFormat;
+                document.getElementById('systemPrompt').value = configStorage.systemPrompt;
+                document.getElementById('userPrompt').value = configStorage.userPrompt;
+                document.getElementById('temperatureValue').textContent = configStorage.temperature;
+
+                // 更新字符计数
+                updateCharCount('systemPrompt', 'systemPromptCount');
+                updateCharCount('userPrompt', 'userPromptCount');
+                updateCharCount('responseArea', 'responseCount');
+            } catch (error) {
+                console.log('配置加载失败:', error);
+            }
+        }
+
+        // 保存配置
+        function saveConfig() {
+            try {
+                configStorage = {
+                    baseUrl: document.getElementById('baseUrl').value,
+                    apiKey: document.getElementById('apiKey').value,
+                    model: document.getElementById('model').value,
+                    temperature: parseFloat(document.getElementById('temperature').value),
+                    maxTokens: parseInt(document.getElementById('maxTokens').value),
+                    responseFormat: document.getElementById('responseFormat').value,
+                    systemPrompt: document.getElementById('systemPrompt').value,
+                    userPrompt: document.getElementById('userPrompt').value
+                };
+
+                localStorage.setItem('aiDebuggerConfig', JSON.stringify(configStorage));
+            } catch (error) {
+                showStatus('配置保存失败: ' + error.message, 'error');
+            }
+        }
+
+        // 切换侧边栏收缩状态
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const mainContent = document.getElementById('mainContent');
+            const collapseBtn = document.getElementById('collapseBtn');
+
+            const isCollapsed = sidebar.classList.contains('collapsed');
+
+            if (isCollapsed) {
+                // 展开
+                sidebar.classList.remove('collapsed');
+                mainContent.classList.remove('collapsed');
+                collapseBtn.textContent = '‹';
+                collapseBtn.title = '收缩配置面板';
+            } else {
+                // 收缩
+                sidebar.classList.add('collapsed');
+                mainContent.classList.add('collapsed');
+                collapseBtn.textContent = '›';
+                collapseBtn.title = '展开配置面板';
+            }
+        }
+
+        // 显示状态消息
+        function showStatus(message, type) {
+            const headerStatus = document.getElementById('headerStatus');
+
+            // 清除之前的状态样式
+            headerStatus.className = '';
+
+            // 设置消息和样式
+            headerStatus.textContent = message;
+            headerStatus.className = `status-${type}`;
+        }
+
+        // 格式化时间（毫秒转换为友好格式）
+        function formatDuration(ms) {
+            if (ms < 1000) {
+                return `${ms.toFixed(0)}ms`;
+            } else if (ms < 60000) {
+                return `${(ms / 1000).toFixed(2)}s`;
+            } else {
+                const minutes = Math.floor(ms / 60000);
+                const seconds = ((ms % 60000) / 1000).toFixed(2);
+                return `${minutes}m ${seconds}s`;
+            }
+        }
+
+        // 重置使用情况信息为默认值
+        function resetUsageInfo() {
+            document.getElementById('durationValue').textContent = '-';
+            document.getElementById('inputTokenValue').textContent = '-';
+            document.getElementById('inputCostValue').textContent = '-';
+            document.getElementById('outputTokenValue').textContent = '-';
+            document.getElementById('outputCostValue').textContent = '-';
+        }
+
+        // 更新使用情况信息
+        function updateUsageInfo(duration, usage) {
+            resetUsageInfo();
+
+            // 更新请求耗时
+            if (typeof duration === "number") {
+                document.getElementById('durationValue').textContent = formatDuration(duration);
+            }
+
+            if (usage) {
+                // 更新输入Token
+                if (usage.prompt_tokens !== undefined) {
+                    document.getElementById('inputTokenValue').innerHTML = `${usage.prompt_tokens}<span class="usage-item-unit">tokens</span>`;
+                }
+
+                // 更新输出Token
+                if (usage.completion_tokens !== undefined) {
+                    document.getElementById('outputTokenValue').innerHTML = `${usage.completion_tokens}<span class="usage-item-unit">tokens</span>`;
+                }
+
+                // 计算费用
+                const modelName = document.getElementById('model').value;
+                const costs = calculateCosts(usage, modelName);
+
+                if (costs) {
+                    document.getElementById('inputCostValue').innerHTML = `${costs.inputCost}<span class="usage-item-unit">¥</span>`;
+                    document.getElementById('outputCostValue').innerHTML = `${costs.outputCost}<span class="usage-item-unit">¥</span>`;
+                }
+            } else {
+                // 没有使用情况信息
+                document.getElementById('inputTokenValue').innerHTML = `-`;
+                document.getElementById('outputTokenValue').innerHTML = `-`;
+                document.getElementById('inputCostValue').innerHTML = `-`;
+                document.getElementById('outputCostValue').innerHTML = `-`;
+            }
+        }
+
+        // 计算输入和输出的费用
+        function calculateCosts(usage, modelName) {
+            // 根据实际API定价调整这里的价格
+            const pricingMap = {
+                'qwen-max': { input: 0.0024, output: 0.0096 }, // 每1K tokens的价格（人民币）
+                'qwen-max-latest': { input: 0.0024, output: 0.0096 },
+                'qwen-max-2025-01-25': { input: 0.0024, output: 0.0096 },
+                'qwen-max-2024-09-19': { input: 0.02, output: 0.06 },
+                'qwen-plus': { input: 0.0008, output: 0.002 },
+                'qwen-plus-latest': { input: 0.004, output: 0.002 },
+                'qwen-plus-2025-04-28': { input: 0.004, output: 0.002 },
+                'qwen-plus-0428': { input: 0.004, output: 0.002 },
+
+                'claude-3-7-sonnet-20250219': { input: 3 * 8 / 1000, output: 15 * 8 / 1000 },
+                'claude-3-7-sonnet-20250219-thinking': { input: 3 * 8 / 1000, output: 15 * 8 / 1000 },
+                'claude-3-haiku-20240307': { input: 0.25 * 8 / 1000, output: 1.25 * 8 / 1000 },
+                'claude-3-opus-20240229': { input: 15 * 8 / 1000, output: 75 * 8 / 1000 },
+                'claude-3-sonnet-20240229': { input: 3 * 8 / 1000, output: 15 * 8 / 1000 },
+                'claude-opus-4-20250514': { input: 15 * 8 / 1000, output: 75 * 8 / 1000 },
+                'claude-sonnet-4-20250514': { input: 3 * 8 / 1000, output: 15 * 8 / 1000 },
+            };
+
+            const pricing = pricingMap[modelName.toLowerCase()];
+            if (!pricing || !usage.prompt_tokens || !usage.completion_tokens) {
+                return null;
+            }
+
+            const inputCost = (usage.prompt_tokens / 1000) * pricing.input;
+            const outputCost = (usage.completion_tokens / 1000) * pricing.output;
+
+            return {
+                inputCost: inputCost.toFixed(4),
+                outputCost: outputCost.toFixed(4),
+                totalCost: (inputCost + outputCost).toFixed(4)
+            };
+        }
+
+        // 重置按钮状态
+        function resetButtonState() {
+            const sendBtn = document.getElementById('sendBtn');
+            const sendBtnText = document.getElementById('sendBtnText');
+            const loading = document.getElementById('loading');
+
+            sendBtn.disabled = false;
+            sendBtn.className = 'btn btn-primary';
+            sendBtnText.textContent = '🚀 发送请求';
+            loading.style.display = 'none';
+            isRequesting = false;
+            currentController = null;
+            currentReader = null;
+        }
+
+        // 设置为停止状态
+        function setStopState() {
+            const sendBtn = document.getElementById('sendBtn');
+            const sendBtnText = document.getElementById('sendBtnText');
+            const loading = document.getElementById('loading');
+
+            sendBtn.disabled = false;
+            sendBtn.className = 'btn btn-stop';
+            sendBtnText.textContent = '⏹️ 停止生成';
+            loading.style.display = 'none';
+            isRequesting = true;
+        }
+
+        // 停止请求
+        function stopRequest() {
+            try {
+                // 取消fetch请求
+                if (currentController) {
+                    currentController.abort();
+                }
+
+                // 关闭reader
+                if (currentReader) {
+                    currentReader.cancel();
+                }
+
+                // 记录结束时间
+                requestStats.endTime = Date.now();
+                requestStats.duration = requestStats.endTime - requestStats.startTime;
+
+                // 更新使用情况信息（显示已使用的时间）
+                updateUsageInfo(requestStats.duration, null);
+
+                showStatus('请求已停止', 'info');
+
+                // 重置按钮状态
+                resetButtonState();
+
+            } catch (error) {
+                console.error('停止请求时出错:', error);
+                showStatus('停止请求时出错', 'error');
+                resetButtonState();
+            }
+        }
+
+        // 发送请求
+        async function sendRequest() {
+            const responseArea = document.getElementById('responseArea');
+
+            // 获取当前配置
+            const baseUrl = document.getElementById('baseUrl').value;
+            const apiKey = document.getElementById('apiKey').value;
+            const model = document.getElementById('model').value;
+            const temperature = parseFloat(document.getElementById('temperature').value);
+            const maxTokens = parseInt(document.getElementById('maxTokens').value);
+            const responseFormat = document.getElementById('responseFormat').value;
+            const systemPrompt = document.getElementById('systemPrompt').value;
+            const userPrompt = document.getElementById('userPrompt').value;
+
+            // 验证必填字段
+            if (!apiKey) {
+                showStatus('请填写API Key', 'error');
+                return;
+            }
+
+            if (!userPrompt.trim()) {
+                showStatus('请输入用户提示词', 'error');
+                return;
+            }
+
+            // 重置请求统计数据
+            requestStats = { startTime: 0, endTime: 0, duration: 0, usage: null };
+            updateUsageInfo(0, null);
+
+            // 设置为停止状态
+            setStopState();
+
+            // 清空响应区域
+            responseArea.value = '';
+            updateCharCount('responseArea', 'responseCount');
+
+            // 记录请求开始时间
+            requestStats.startTime = Date.now();
+
+            // 创建AbortController用于取消请求
+            currentController = new AbortController();
+
+            try {
+                // 构建消息
+                const messages = [];
+                if (systemPrompt.trim()) {
+                    messages.push({ role: 'system', content: systemPrompt });
+                }
+                messages.push({ role: 'user', content: userPrompt });
+
+                // 构建请求体
+                const requestBody = {
+                    model: model,
+                    messages: messages,
+                    temperature: temperature,
+                    max_tokens: maxTokens,
+                    stream: true,
+                    stream_options: { include_usage: true },
+                };
+
+                // 如果选择了response_format，添加到请求体
+                if (responseFormat) {
+                    requestBody.response_format = { type: responseFormat };
+                }
+
+                // 发送流式请求
+                const response = await fetch(`${baseUrl}/chat/completions`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${apiKey}`
+                    },
+                    body: JSON.stringify(requestBody),
+                    signal: currentController.signal
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(`API错误 (${response.status}): ${errorData.error?.message || '未知错误'}`);
+                }
+
+                // 处理流式响应
+                currentReader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                let lastUsage = null;
+
+                showStatus('开始接收AI回答...', 'info');
+
+                while (true) {
+                    const { done, value } = await currentReader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop(); // 保留不完整的行
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = line.slice(6);
+                            if (data === '[DONE]') continue;
+
+                            try {
+                                const parsed = JSON.parse(data);
+                                const content = parsed.choices?.[0]?.delta?.content;
+                                if (content) {
+                                    responseArea.value += content;
+                                    responseArea.scrollTop = responseArea.scrollHeight;
+                                }
+
+                                // 保存usage信息（通常在最后一个chunk中）
+                                if (parsed.usage) {
+                                    lastUsage = parsed.usage;
+                                }
+                            } catch (e) {
+                                console.error('解析响应数据失败:', e);
+                            }
+                        }
+                    }
+                    // 实时更新AI回答字符计数
+                    updateCharCount('responseArea', 'responseCount');
+                }
+
+                // 记录请求结束时间
+                requestStats.endTime = Date.now();
+                requestStats.duration = requestStats.endTime - requestStats.startTime;
+                requestStats.usage = lastUsage;
+
+                // 显示使用情况信息
+                updateUsageInfo(requestStats.duration, requestStats.usage);
+
+                showStatus('回答完成！', 'success');
+
+            } catch (error) {
+                console.error('请求失败:', error);
+
+                // 记录错误时的结束时间
+                requestStats.endTime = Date.now();
+                requestStats.duration = requestStats.endTime - requestStats.startTime;
+
+                // 检查是否是用户主动取消
+                if (error.name === 'AbortError') {
+                    showStatus('请求已被用户停止', 'info');
+                } else {
+                    // 显示错误时的使用情况（至少显示耗时）
+                    updateUsageInfo(requestStats.duration, null);
+                    showStatus(`请求失败: ${error.message}`, 'error');
+                    responseArea.value = `错误: ${error.message}`;
+                    updateCharCount('responseArea', 'responseCount');
+                }
+            } finally {
+                // 重置按钮状态
+                resetButtonState();
+            }
+        }
+
+        // 清空所有输入
+        function clearInputs() {
+            document.getElementById('systemPrompt').value = '';
+            document.getElementById('userPrompt').value = '';
+            document.getElementById('responseArea').value = '';
+            resetUsageInfo();
+
+            // 更新字符计数
+            updateCharCount('systemPrompt', 'systemPromptCount');
+            updateCharCount('userPrompt', 'userPromptCount');
+            updateCharCount('responseArea', 'responseCount');
+
+            saveConfig();
+        }
+
+        // 处理发送/停止按钮点击
+        function handleSendButtonClick() {
+            if (isRequesting) {
+                stopRequest();
+            } else {
+                sendRequest();
+            }
+        }
+
+        // 绑定事件
+        document.getElementById('sendBtn').addEventListener('click', handleSendButtonClick);
+        document.getElementById('clearBtn').addEventListener('click', clearInputs);
+        document.getElementById('collapseBtn').addEventListener('click', () => toggleSidebar());
+        document.getElementById('copyBtn').addEventListener('click', copyResponse);
+
+        // 为文本框添加字符计数事件
+        document.getElementById('systemPrompt').addEventListener('input', function () {
+            updateCharCount('systemPrompt', 'systemPromptCount');
+            saveConfig();
+        });
+
+        document.getElementById('userPrompt').addEventListener('input', function () {
+            updateCharCount('userPrompt', 'userPromptCount');
+            saveConfig();
+        });
+
+        // 为responseArea添加字符计数事件
+        document.getElementById('responseArea').addEventListener('input', function () {
+            updateCharCount('responseArea', 'responseCount');
+        });
+
+        // 为所有配置输入框添加实时保存事件
+        document.getElementById('temperature').addEventListener('input', function () {
+            document.getElementById('temperatureValue').textContent = this.value;
+            saveConfig();
+        });
+        document.getElementById('baseUrl').addEventListener('input', saveConfig);
+        document.getElementById('apiKey').addEventListener('input', saveConfig);
+        document.getElementById('model').addEventListener('input', saveConfig);
+        document.getElementById('maxTokens').addEventListener('input', saveConfig);
+
+        // 支持Ctrl+Enter快捷键发送（只在非请求状态下生效）
+        document.getElementById('userPrompt').addEventListener('keydown', function (e) {
+            if (e.ctrlKey && e.key === 'Enter' && !isRequesting) {
+                sendRequest();
+            }
+        });
+
+        // 页面加载时初始化
+        window.addEventListener('load', loadConfig);
+    </script>
+</body>
+
+</html>
