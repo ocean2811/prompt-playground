@@ -2,10 +2,18 @@
 
 一个简洁而强大的AI提示词调试工具，支持实时测试和优化AI提示词，帮助开发者快速验证提示词效果。
 
+直接访问 GitHub Pages 部署的在线版本：[在线体验](https://ocean2811.github.io/prompt-playground)
+
 ![GitHub](https://img.shields.io/github/license/ocean2811/prompt-playground)
 ![HTML](https://img.shields.io/badge/HTML-E34F26?style=flat&logo=html5&logoColor=white)
 ![CSS](https://img.shields.io/badge/CSS-1572B6?style=flat&logo=css3&logoColor=white)
 ![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=flat&logo=javascript&logoColor=black)
+
+
+
+![image-20250624171055720](assets/image-20250624171055720.png)
+
+
 
 ## ✨ 特性
 
@@ -40,7 +48,12 @@
 
 ## 🛠️ 安装使用
 
+### 方式一：在线使用
+
+直接访问 GitHub Pages 部署的在线版本：[在线体验](https://ocean2811.github.io/prompt-playground)
+
 ### 方式一：直接使用
+
 1. 下载 `prompt-playground.html` 文件
 2. 用浏览器打开文件即可使用
 3. 无需安装任何依赖或服务器
