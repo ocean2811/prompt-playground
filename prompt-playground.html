@@ -72,7 +72,7 @@
 
         .main-content {
             display: grid;
-            grid-template-columns: 260px 1fr;
+            grid-template-columns: 280px 1fr;
             flex: 1;
             overflow: hidden;
             transition: grid-template-columns 0.3s ease;
@@ -194,6 +194,33 @@
             outline: none;
             border-color: #4f46e5;
             box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.1);
+        }
+
+        /* 思考模式单选按钮样式 */
+        .radio-group {
+            display: flex;
+            gap: 8px;
+            margin-top: 4px;
+        }
+
+        .radio-option {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+            font-size: 0.8rem;
+        }
+
+        .radio-option:hover {
+            background: #f3f4f6;
+        }
+
+        .radio-option input[type="radio"] {
+            margin: 0 4px 0 0;
+            width: auto;
+            padding: 0;
         }
 
         .chat-area {
@@ -318,10 +345,48 @@
             margin-bottom: 8px;
         }
 
+        .response-header-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
         .response-header h3 {
             color: #374151;
             font-size: 0.9rem;
             font-weight: 600;
+        }
+
+        /* 思考内容/回答内容切换按钮 */
+        .view-toggle {
+            display: flex;
+            background: #f3f4f6;
+            border-radius: 6px;
+            padding: 2px;
+            gap: 2px;
+        }
+
+        .view-toggle-btn {
+            background: none;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: #6b7280;
+            font-weight: 500;
+        }
+
+        .view-toggle-btn.active {
+            background: white;
+            color: #4f46e5;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        }
+
+        .view-toggle-btn:hover:not(.active) {
+            color: #374151;
+            background: #e5e7eb;
         }
 
         .copy-btn {
@@ -363,12 +428,20 @@
             min-height: 120px;
             resize: vertical;
             transition: border-color 0.2s, box-shadow 0.2s;
+            overflow-y: auto;
         }
 
         .response-area:focus {
             outline: none;
             border-color: #4f46e5;
             box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.1);
+        }
+
+        /* 思考内容特殊样式 */
+        .response-area.thinking {
+            background: #fef3c7;
+            border-color: #fbbf24;
+            color: #92400e;
         }
 
         .usage-section {
@@ -447,6 +520,11 @@
             to {
                 transform: rotate(360deg);
             }
+        }
+
+        /* 隐藏元素 */
+        .hidden {
+            display: none !important;
         }
 
         @media (max-width: 768px) {
@@ -569,6 +647,19 @@
                                 <option value="json_schema">JSON Schema</option>
                             </select>
                         </div>
+                        <div class="form-group">
+                            <label>思考模式</label>
+                            <div class="radio-group">
+                                <label class="radio-option">
+                                    <input type="radio" name="thinkingMode" value="off" checked>
+                                    关闭
+                                </label>
+                                <label class="radio-option">
+                                    <input type="radio" name="thinkingMode" value="on">
+                                    开启
+                                </label>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -600,15 +691,23 @@
 
                 <div class="response-section">
                     <div class="response-header">
-                        <div class="section-header" style="margin-bottom: 0;">
+                        <div class="response-header-left">
                             <h3>🤖 AI回答</h3>
-                            <span class="char-count" id="responseCount">0</span>
+                            <div class="view-toggle" id="viewToggle">
+                                <button class="view-toggle-btn active" data-view="answer">回答内容</button>
+                                <button class="view-toggle-btn" data-view="thinking">思考内容</button>
+                            </div>
                         </div>
-                        <button id="copyBtn" class="copy-btn" title="复制回答内容">
-                            📋 复制
-                        </button>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span class="char-count" id="responseCount">0</span>
+                            <button id="copyBtn" class="copy-btn" title="复制当前显示内容">
+                                📋 复制
+                            </button>
+                        </div>
                     </div>
-                    <textarea id="responseArea" class="response-area" readonly placeholder="等待AI回答..."></textarea>
+                    <textarea id="answerArea" class="response-area" readonly placeholder="等待AI回答..."></textarea>
+                    <textarea id="thinkingArea" class="response-area thinking hidden" readonly
+                        placeholder="等待AI思考..."></textarea>
                 </div>
 
                 <div class="usage-section" id="usageSection">
@@ -650,22 +749,63 @@
             temperature: 0.8,
             maxTokens: 8192,
             responseFormat: '',
+            thinkingMode: 'off',
             systemPrompt: '',
             userPrompt: '',
         };
 
-        // 请求统计数据
-        let requestStats = {
-            startTime: 0,
-            endTime: 0,
-            duration: 0,
-            usage: null
+        // 应用状态管理
+        const appState = {
+            // 请求统计数据
+            requestStats: {
+                startTime: 0,
+                endTime: 0,
+                duration: 0,
+                usage: null
+            },
+            // 请求控制器和状态
+            currentController: null,
+            currentReader: null,
+            isRequesting: false,
+            // 当前视图状态
+            currentView: 'answer', // 'answer' 或 'thinking'
+            hasThinkingContent: false,
+            hasAnswerContent: false
         };
 
-        // 请求控制器和状态
-        let currentController = null;
-        let currentReader = null;
-        let isRequesting = false;
+        // DOM元素缓存
+        const elements = {
+            systemPrompt: null,
+            userPrompt: null,
+            answerArea: null,
+            thinkingArea: null,
+            sendBtn: null,
+            sendBtnText: null,
+            loading: null,
+            headerStatus: null,
+            viewToggle: null,
+            copyBtn: null,
+            sidebar: null,
+            mainContent: null,
+            collapseBtn: null
+        };
+
+        // 初始化DOM元素缓存
+        function initElements() {
+            elements.systemPrompt = document.getElementById('systemPrompt');
+            elements.userPrompt = document.getElementById('userPrompt');
+            elements.answerArea = document.getElementById('answerArea');
+            elements.thinkingArea = document.getElementById('thinkingArea');
+            elements.sendBtn = document.getElementById('sendBtn');
+            elements.sendBtnText = document.getElementById('sendBtnText');
+            elements.loading = document.getElementById('loading');
+            elements.headerStatus = document.getElementById('headerStatus');
+            elements.viewToggle = document.getElementById('viewToggle');
+            elements.copyBtn = document.getElementById('copyBtn');
+            elements.sidebar = document.getElementById('sidebar');
+            elements.mainContent = document.getElementById('mainContent');
+            elements.collapseBtn = document.getElementById('collapseBtn');
+        }
 
         // 更新字符计数
         function updateCharCount(textareaId, countId) {
@@ -702,12 +842,39 @@
             }
         }
 
-        // 复制AI回答
-        async function copyResponse() {
-            const responseArea = document.getElementById('responseArea');
-            const copyBtn = document.getElementById('copyBtn');
+        // 切换视图显示
+        function switchView(view) {
+            const answerArea = document.getElementById('answerArea');
+            const thinkingArea = document.getElementById('thinkingArea');
+            const viewToggleBtns = document.querySelectorAll('.view-toggle-btn');
 
-            const success = await copyToClipboard(responseArea.value);
+            appState.currentView = view;
+
+            // 更新按钮状态
+            viewToggleBtns.forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.view === view);
+            });
+
+            // 切换显示区域
+            if (view === 'thinking') {
+                answerArea.classList.add('hidden');
+                thinkingArea.classList.remove('hidden');
+                updateCharCount('thinkingArea', 'responseCount');
+            } else {
+                thinkingArea.classList.add('hidden');
+                answerArea.classList.remove('hidden');
+                updateCharCount('answerArea', 'responseCount');
+            }
+        }
+
+        // 复制当前显示的内容
+        async function copyCurrentView() {
+            const copyBtn = document.getElementById('copyBtn');
+            const currentArea = appState.currentView === 'thinking' ?
+                document.getElementById('thinkingArea') :
+                document.getElementById('answerArea');
+
+            const success = await copyToClipboard(currentArea.value);
 
             if (success) {
                 copyBtn.innerHTML = '✅ 已复制';
@@ -718,10 +885,30 @@
                     copyBtn.classList.remove('copied');
                 }, 2000);
 
-                showStatus('回答内容已复制到剪贴板', 'success');
+                const viewName = appState.currentView === 'thinking' ? '思考内容' : '回答内容';
+                showStatus(`${viewName}已复制到剪贴板`, 'success');
             } else {
                 showStatus('复制失败，请手动选择文本复制', 'error');
             }
+        }
+
+        // 获取思考模式状态
+        function getThinkingMode() {
+            const radios = document.querySelectorAll('input[name="thinkingMode"]');
+            for (const radio of radios) {
+                if (radio.checked) {
+                    return radio.value;
+                }
+            }
+            return 'off';
+        }
+
+        // 设置思考模式状态
+        function setThinkingMode(value) {
+            const radios = document.querySelectorAll('input[name="thinkingMode"]');
+            radios.forEach(radio => {
+                radio.checked = radio.value === value;
+            });
         }
 
         // 页面加载时恢复配置
@@ -738,6 +925,7 @@
                 document.getElementById('temperature').value = configStorage.temperature;
                 document.getElementById('maxTokens').value = configStorage.maxTokens;
                 document.getElementById('responseFormat').value = configStorage.responseFormat;
+                setThinkingMode(configStorage.thinkingMode);
                 document.getElementById('systemPrompt').value = configStorage.systemPrompt;
                 document.getElementById('userPrompt').value = configStorage.userPrompt;
                 document.getElementById('temperatureValue').textContent = configStorage.temperature;
@@ -745,7 +933,10 @@
                 // 更新字符计数
                 updateCharCount('systemPrompt', 'systemPromptCount');
                 updateCharCount('userPrompt', 'userPromptCount');
-                updateCharCount('responseArea', 'responseCount');
+                updateCharCount('answerArea', 'responseCount');
+
+                // 根据思考模式更新视图切换按钮的显示
+                updateViewToggleVisibility();
             } catch (error) {
                 console.log('配置加载失败:', error);
             }
@@ -761,6 +952,7 @@
                     temperature: parseFloat(document.getElementById('temperature').value),
                     maxTokens: parseInt(document.getElementById('maxTokens').value),
                     responseFormat: document.getElementById('responseFormat').value,
+                    thinkingMode: getThinkingMode(),
                     systemPrompt: document.getElementById('systemPrompt').value,
                     userPrompt: document.getElementById('userPrompt').value
                 };
@@ -768,6 +960,20 @@
                 localStorage.setItem('aiDebuggerConfig', JSON.stringify(configStorage));
             } catch (error) {
                 showStatus('配置保存失败: ' + error.message, 'error');
+            }
+        }
+
+        // 更新视图切换按钮的显示状态
+        function updateViewToggleVisibility() {
+            const viewToggle = document.getElementById('viewToggle');
+            const thinkingMode = getThinkingMode();
+
+            if (thinkingMode === 'on') {
+                viewToggle.style.display = 'flex';
+            } else {
+                viewToggle.style.display = 'none';
+                // 如果关闭思考模式，切换到回答视图
+                switchView('answer');
             }
         }
 
@@ -821,11 +1027,10 @@
 
         // 重置使用情况信息为默认值
         function resetUsageInfo() {
-            document.getElementById('durationValue').textContent = '-';
-            document.getElementById('inputTokenValue').textContent = '-';
-            document.getElementById('inputCostValue').textContent = '-';
-            document.getElementById('outputTokenValue').textContent = '-';
-            document.getElementById('outputCostValue').textContent = '-';
+            const usageFields = ['durationValue', 'inputTokenValue', 'inputCostValue', 'outputTokenValue', 'outputCostValue'];
+            usageFields.forEach(fieldId => {
+                document.getElementById(fieldId).textContent = '-';
+            });
         }
 
         // 更新使用情况信息
@@ -856,12 +1061,6 @@
                     document.getElementById('inputCostValue').innerHTML = `${costs.inputCost}<span class="usage-item-unit">¥</span>`;
                     document.getElementById('outputCostValue').innerHTML = `${costs.outputCost}<span class="usage-item-unit">¥</span>`;
                 }
-            } else {
-                // 没有使用情况信息
-                document.getElementById('inputTokenValue').innerHTML = `-`;
-                document.getElementById('outputTokenValue').innerHTML = `-`;
-                document.getElementById('inputCostValue').innerHTML = `-`;
-                document.getElementById('outputCostValue').innerHTML = `-`;
             }
         }
 
@@ -912,9 +1111,9 @@
             sendBtn.className = 'btn btn-primary';
             sendBtnText.textContent = '🚀 发送请求';
             loading.style.display = 'none';
-            isRequesting = false;
-            currentController = null;
-            currentReader = null;
+            appState.isRequesting = false;
+            appState.currentController = null;
+            appState.currentReader = null;
         }
 
         // 设置为停止状态
@@ -927,28 +1126,28 @@
             sendBtn.className = 'btn btn-stop';
             sendBtnText.textContent = '⏹️ 停止生成';
             loading.style.display = 'none';
-            isRequesting = true;
+            appState.isRequesting = true;
         }
 
         // 停止请求
         function stopRequest() {
             try {
                 // 取消fetch请求
-                if (currentController) {
-                    currentController.abort();
+                if (appState.currentController) {
+                    appState.currentController.abort();
                 }
 
                 // 关闭reader
-                if (currentReader) {
-                    currentReader.cancel();
+                if (appState.currentReader) {
+                    appState.currentReader.cancel();
                 }
 
                 // 记录结束时间
-                requestStats.endTime = Date.now();
-                requestStats.duration = requestStats.endTime - requestStats.startTime;
+                appState.requestStats.endTime = Date.now();
+                appState.requestStats.duration = appState.requestStats.endTime - appState.requestStats.startTime;
 
                 // 更新使用情况信息（显示已使用的时间）
-                updateUsageInfo(requestStats.duration, null);
+                updateUsageInfo(appState.requestStats.duration, null);
 
                 showStatus('请求已停止', 'info');
 
@@ -964,7 +1163,8 @@
 
         // 发送请求
         async function sendRequest() {
-            const responseArea = document.getElementById('responseArea');
+            const answerArea = document.getElementById('answerArea');
+            const thinkingArea = document.getElementById('thinkingArea');
 
             // 获取当前配置
             const baseUrl = document.getElementById('baseUrl').value;
@@ -973,6 +1173,7 @@
             const temperature = parseFloat(document.getElementById('temperature').value);
             const maxTokens = parseInt(document.getElementById('maxTokens').value);
             const responseFormat = document.getElementById('responseFormat').value;
+            const thinkingMode = getThinkingMode();
             const systemPrompt = document.getElementById('systemPrompt').value;
             const userPrompt = document.getElementById('userPrompt').value;
 
@@ -987,22 +1188,34 @@
                 return;
             }
 
-            // 重置请求统计数据
-            requestStats = { startTime: 0, endTime: 0, duration: 0, usage: null };
+            // 重置状态
+            appState.hasThinkingContent = false;
+            appState.hasAnswerContent = false;
+            appState.requestStats = { startTime: 0, endTime: 0, duration: 0, usage: null };
             updateUsageInfo(0, null);
 
             // 设置为停止状态
             setStopState();
 
             // 清空响应区域
-            responseArea.value = '';
-            updateCharCount('responseArea', 'responseCount');
+            answerArea.value = '';
+            thinkingArea.value = '';
+
+            // 根据思考模式决定初始显示哪个区域
+            if (thinkingMode === 'on') {
+                switchView('thinking');
+            } else {
+                switchView('answer');
+            }
+
+            updateCharCount('answerArea', 'responseCount');
+            updateCharCount('thinkingArea', 'responseCount');
 
             // 记录请求开始时间
-            requestStats.startTime = Date.now();
+            appState.requestStats.startTime = Date.now();
 
             // 创建AbortController用于取消请求
-            currentController = new AbortController();
+            appState.currentController = new AbortController();
 
             try {
                 // 构建消息
@@ -1027,6 +1240,12 @@
                     requestBody.response_format = { type: responseFormat };
                 }
 
+                // 如果开启思考模式，添加enable_think字段
+                if (thinkingMode === 'on') {
+                    requestBody.enable_thinking = true;
+                    requestBody.thinking = { type: "enabled", budget_tokens: 2048 };
+                }
+
                 // 发送流式请求
                 const response = await fetch(`${baseUrl}/chat/completions`, {
                     method: 'POST',
@@ -1035,7 +1254,7 @@
                         'Authorization': `Bearer ${apiKey}`
                     },
                     body: JSON.stringify(requestBody),
-                    signal: currentController.signal
+                    signal: appState.currentController.signal
                 });
 
                 if (!response.ok) {
@@ -1044,7 +1263,7 @@
                 }
 
                 // 处理流式响应
-                currentReader = response.body.getReader();
+                appState.currentReader = response.body.getReader();
                 const decoder = new TextDecoder();
                 let buffer = '';
                 let lastUsage = null;
@@ -1052,7 +1271,7 @@
                 showStatus('开始接收AI回答...', 'info');
 
                 while (true) {
-                    const { done, value } = await currentReader.read();
+                    const { done, value } = await appState.currentReader.read();
                     if (done) break;
 
                     buffer += decoder.decode(value, { stream: true });
@@ -1066,10 +1285,36 @@
 
                             try {
                                 const parsed = JSON.parse(data);
+
+                                // 处理思考内容
+                                const reasoningContent = parsed.choices?.[0]?.delta?.reasoning_content;
+                                if (reasoningContent && thinkingMode === 'on') {
+                                    thinkingArea.value += reasoningContent;
+                                    thinkingArea.scrollTop = thinkingArea.scrollHeight;
+                                    appState.hasThinkingContent = true;
+
+                                    // 如果当前显示的是思考内容，更新字符计数
+                                    if (appState.currentView === 'thinking') {
+                                        updateCharCount('thinkingArea', 'responseCount');
+                                    }
+                                }
+
+                                // 处理回答内容
                                 const content = parsed.choices?.[0]?.delta?.content;
                                 if (content) {
-                                    responseArea.value += content;
-                                    responseArea.scrollTop = responseArea.scrollHeight;
+                                    answerArea.value += content;
+                                    answerArea.scrollTop = answerArea.scrollHeight;
+
+                                    // 自动切换到回答视图
+                                    if (appState.currentView === 'thinking' && !appState.hasAnswerContent) {
+                                        switchView('answer');
+                                    }
+                                    appState.hasAnswerContent = true;
+
+                                    // 如果当前显示的是回答内容，更新字符计数
+                                    if (appState.currentView === 'answer') {
+                                        updateCharCount('answerArea', 'responseCount');
+                                    }
                                 }
 
                                 // 保存usage信息（通常在最后一个chunk中）
@@ -1081,17 +1326,15 @@
                             }
                         }
                     }
-                    // 实时更新AI回答字符计数
-                    updateCharCount('responseArea', 'responseCount');
                 }
 
                 // 记录请求结束时间
-                requestStats.endTime = Date.now();
-                requestStats.duration = requestStats.endTime - requestStats.startTime;
-                requestStats.usage = lastUsage;
+                appState.requestStats.endTime = Date.now();
+                appState.requestStats.duration = appState.requestStats.endTime - appState.requestStats.startTime;
+                appState.requestStats.usage = lastUsage;
 
                 // 显示使用情况信息
-                updateUsageInfo(requestStats.duration, requestStats.usage);
+                updateUsageInfo(appState.requestStats.duration, appState.requestStats.usage);
 
                 showStatus('回答完成！', 'success');
 
@@ -1099,18 +1342,21 @@
                 console.error('请求失败:', error);
 
                 // 记录错误时的结束时间
-                requestStats.endTime = Date.now();
-                requestStats.duration = requestStats.endTime - requestStats.startTime;
+                appState.requestStats.endTime = Date.now();
+                appState.requestStats.duration = appState.requestStats.endTime - appState.requestStats.startTime;
 
                 // 检查是否是用户主动取消
                 if (error.name === 'AbortError') {
                     showStatus('请求已被用户停止', 'info');
                 } else {
                     // 显示错误时的使用情况（至少显示耗时）
-                    updateUsageInfo(requestStats.duration, null);
+                    updateUsageInfo(appState.requestStats.duration, null);
                     showStatus(`请求失败: ${error.message}`, 'error');
-                    responseArea.value = `错误: ${error.message}`;
-                    updateCharCount('responseArea', 'responseCount');
+                    answerArea.value = `错误: ${error.message}`;
+                    if (appState.currentView === 'thinking') {
+                        switchView('answer');
+                    }
+                    updateCharCount('answerArea', 'responseCount');
                 }
             } finally {
                 // 重置按钮状态
@@ -1122,20 +1368,28 @@
         function clearInputs() {
             document.getElementById('systemPrompt').value = '';
             document.getElementById('userPrompt').value = '';
-            document.getElementById('responseArea').value = '';
+            document.getElementById('answerArea').value = '';
+            document.getElementById('thinkingArea').value = '';
+            if (appState.currentView === 'thinking') {
+                switchView('answer');
+            }
             resetUsageInfo();
+
+            // 重置状态
+            appState.hasThinkingContent = false;
+            appState.hasAnswerContent = false;
 
             // 更新字符计数
             updateCharCount('systemPrompt', 'systemPromptCount');
             updateCharCount('userPrompt', 'userPromptCount');
-            updateCharCount('responseArea', 'responseCount');
+            updateCharCount('answerArea', 'responseCount');
 
             saveConfig();
         }
 
         // 处理发送/停止按钮点击
         function handleSendButtonClick() {
-            if (isRequesting) {
+            if (appState.isRequesting) {
                 stopRequest();
             } else {
                 sendRequest();
@@ -1146,7 +1400,22 @@
         document.getElementById('sendBtn').addEventListener('click', handleSendButtonClick);
         document.getElementById('clearBtn').addEventListener('click', clearInputs);
         document.getElementById('collapseBtn').addEventListener('click', () => toggleSidebar());
-        document.getElementById('copyBtn').addEventListener('click', copyResponse);
+        document.getElementById('copyBtn').addEventListener('click', copyCurrentView);
+
+        // 视图切换按钮事件
+        document.querySelectorAll('.view-toggle-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                switchView(btn.dataset.view);
+            });
+        });
+
+        // 思考模式切换事件
+        document.querySelectorAll('input[name="thinkingMode"]').forEach(radio => {
+            radio.addEventListener('change', () => {
+                updateViewToggleVisibility();
+                saveConfig();
+            });
+        });
 
         // 为文本框添加字符计数事件
         document.getElementById('systemPrompt').addEventListener('input', function () {
@@ -1159,24 +1428,21 @@
             saveConfig();
         });
 
-        // 为responseArea添加字符计数事件
-        document.getElementById('responseArea').addEventListener('input', function () {
-            updateCharCount('responseArea', 'responseCount');
+        // 为所有配置输入框添加实时保存事件
+        ['baseUrl', 'apiKey', 'model', 'maxTokens'].forEach(id => {
+            document.getElementById(id).addEventListener('input', saveConfig);
         });
 
-        // 为所有配置输入框添加实时保存事件
         document.getElementById('temperature').addEventListener('input', function () {
             document.getElementById('temperatureValue').textContent = this.value;
             saveConfig();
         });
-        document.getElementById('baseUrl').addEventListener('input', saveConfig);
-        document.getElementById('apiKey').addEventListener('input', saveConfig);
-        document.getElementById('model').addEventListener('input', saveConfig);
-        document.getElementById('maxTokens').addEventListener('input', saveConfig);
+
+        document.getElementById('responseFormat').addEventListener('change', saveConfig);
 
         // 支持Ctrl+Enter快捷键发送（只在非请求状态下生效）
         document.getElementById('userPrompt').addEventListener('keydown', function (e) {
-            if (e.ctrlKey && e.key === 'Enter' && !isRequesting) {
+            if (e.ctrlKey && e.key === 'Enter' && !appState.isRequesting) {
                 sendRequest();
             }
         });
