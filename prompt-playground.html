@@ -1244,6 +1244,8 @@
                 if (thinkingMode === 'on') {
                     requestBody.enable_thinking = true;
                     requestBody.thinking = { type: "enabled", budget_tokens: 2048 };
+                    requestBody.thinking = { type: "enabled", budget_tokens: 2048 };
+                    requestBody.reasoning = { effort: "high" };
                 }
 
                 // 发送流式请求
@@ -1288,6 +1290,9 @@
 
                                 // 处理思考内容
                                 const reasoningContent = parsed.choices?.[0]?.delta?.reasoning_content;
+                                if (!reasoningContent) {
+                                    reasoningContent = parsed.choices?.[0]?.delta?.reasoning;
+                                }
                                 if (reasoningContent && thinkingMode === 'on') {
                                     thinkingArea.value += reasoningContent;
                                     thinkingArea.scrollTop = thinkingArea.scrollHeight;
