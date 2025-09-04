@@ -1289,7 +1289,7 @@
                                 const parsed = JSON.parse(data);
 
                                 // 处理思考内容
-                                const reasoningContent = parsed.choices?.[0]?.delta?.reasoning_content;
+                                let reasoningContent = parsed.choices?.[0]?.delta?.reasoning_content;
                                 if (!reasoningContent) {
                                     reasoningContent = parsed.choices?.[0]?.delta?.reasoning;
                                 }
